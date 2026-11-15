@@ -76,12 +76,48 @@ jobs:
 
       - name: Build recovery image
         run: |
+          set -o pipefail
           cd "$HOME/fox"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
-          set +e
           source build/envsetup.sh
-          lunch twrp_PJV110-eng
+
+          MENU="$GITHUB_WORKSPACE/lunch_menu.txt"
+
+          echo "== device tree =="
+          ls -l device/oplus/PJV110 || true
+
+          echo "== release configs =="
+          ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 40 || echo "(no build/release)"
+
+          echo "== lunch menu =="
+          lunch > "$MENU" 2>&1 || true
+          grep -n "twrp_PJV110" "$MENU" | head -n 20 || true
+          tail -n 30 "$MENU" || true
+
+          # Android 16+ requires <product>-<release>-<variant>; discover the
+          # release name that this branch actually ships and probe candidates.
+          COMBO="$(grep -oE 'twrp_PJV110-[A-Za-z0-9_]+-(eng|userdebug)' "$MENU" | head -n1 || true)"
+          echo "combo from menu: ${COMBO:-<none>}"
+
+          CANDIDATES="${COMBO:-}"
+          for REL in $(ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 8) trunk_staging; do
+            CANDIDATES="$CANDIDATES twrp_PJV110-${REL}-eng"
+          done
+
+          ok=0
+          for C in $CANDIDATES; do
+            echo "== lunch $C =="
+            if lunch "$C"; then ok=1; COMBO="$C"; break; fi
+          done
+          if [ "$ok" != "1" ]; then
+            echo "!! no working lunch combo for twrp_PJV110"
+            exit 1
+          fi
+          echo "== using combo: $COMBO =="
+
+          echo "== mka recoveryimage =="
+          set +e
           mka recoveryimage -j"$(nproc)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           rc=${PIPESTATUS[0]}
           echo "build exit code: $rc"
@@ -98,6 +134,7 @@ jobs:
           path: |
             OrangeFox-PJV110-vendor_boot.img
             build.log
+            lunch_menu.txt
           if-no-files-found: error
 
       - name: Upload build log (failure)
