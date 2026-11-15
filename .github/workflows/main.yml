@@ -1,1 +1,109 @@
+name: orangeFox-PJV110
 
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: of-pjv110-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build OrangeFox vendor_boot (PJV110)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 355
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          echo "== before =="; df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean
+          echo "== after =="; df -h /
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git curl python3 openjdk-17-jdk-headless \
+                                      zip unzip zstd libssl-dev
+          mkdir -p "$HOME/bin"
+          curl -sSL https://storage.googleapis.com/git-repo-downloads/repo > "$HOME/bin/repo"
+          chmod a+x "$HOME/bin/repo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          git config --global user.name "orangefox-ci"
+          git config --global user.email "ci@localhost"
+          git config --global color.ui false
+          repo --version | head -n 2 || true
+
+      - name: Sync OrangeFox sources
+        run: |
+          set -o pipefail
+          git clone --depth=1 https://gitlab.com/OrangeFox/sync.git "$HOME/ofsync"
+          cd "$HOME/ofsync"
+          chmod +x orangefox_sync.sh
+          ok=0
+          for BR in 16.0 15.0 14.1; do
+            echo "== trying OrangeFox branch $BR =="
+            if ./orangefox_sync.sh --branch "$BR" --path "$HOME/fox"; then
+              if [ -d "$HOME/fox/build" ]; then
+                echo "OF_BRANCH=$BR" >> "$GITHUB_ENV"
+                ok=1
+                break
+              fi
+            fi
+            echo "== branch $BR failed, cleaning up =="
+            rm -rf "$HOME/fox"
+          done
+          if [ "$ok" != "1" ]; then
+            echo "!! OrangeFox sync failed for all branches"
+            exit 1
+          fi
+          echo "== freeing .repo =="
+          du -sh "$HOME/fox/.repo" 2>/dev/null || true
+          rm -rf "$HOME/fox/.repo"
+          df -h /
+
+      - name: Copy device tree
+        run: |
+          mkdir -p "$HOME/fox/device/oplus"
+          cp -r device/oplus/PJV110 "$HOME/fox/device/oplus/PJV110"
+          ls -l "$HOME/fox/device/oplus/PJV110"
+
+      - name: Build recovery image
+        run: |
+          cd "$HOME/fox"
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export LC_ALL=C
+          set +e
+          source build/envsetup.sh
+          lunch twrp_PJV110-eng
+          mka recoveryimage -j"$(nproc)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          rc=${PIPESTATUS[0]}
+          echo "build exit code: $rc"
+          exit $rc
+
+      - name: Pack vendor_boot image
+        run: |
+          SRC="$HOME/fox" bash scripts/pack.sh
+
+      - name: Upload vendor_boot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrangeFox-PJV110-vendor_boot
+          path: |
+            OrangeFox-PJV110-vendor_boot.img
+            build.log
+          if-no-files-found: error
+
+      - name: Upload build log (failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-failure
+          path: build.log
+          if-no-files-found: ignore
