@@ -76,39 +76,61 @@ jobs:
 
       - name: Build recovery image
         run: |
+          set +e
           set -o pipefail
           cd "$HOME/fox"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
+
+          echo "== sourcing envsetup =="
           source build/envsetup.sh
+          echo "envsetup rc=$?"
+          echo "pwd=$(pwd)"
+          ls -l build/envsetup.sh 2>/dev/null
+          type lunch >/dev/null 2>&1; echo "lunch defined: $?"
 
           MENU="$GITHUB_WORKSPACE/lunch_menu.txt"
 
           echo "== device tree =="
-          ls -l device/oplus/PJV110 || true
+          ls -l device/oplus/PJV110
 
-          echo "== release configs =="
-          ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 40 || echo "(no build/release)"
+          echo "== release configs dir =="
+          ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 40
+          echo "== release config map =="
+          sed -n '1,60p' build/release/release_config_map.mk 2>/dev/null
 
           echo "== lunch menu =="
-          lunch > "$MENU" 2>&1 || true
-          grep -n "twrp_PJV110" "$MENU" | head -n 20 || true
-          tail -n 30 "$MENU" || true
+          lunch > "$MENU" 2>&1
+          echo "lunch(menu) rc=$?"
+          grep -n "twrp_PJV110" "$MENU" | head -n 20
+          tail -n 40 "$MENU"
 
-          # Android 16+ requires <product>-<release>-<variant>; discover the
-          # release name that this branch actually ships and probe candidates.
-          COMBO="$(grep -oE 'twrp_PJV110-[A-Za-z0-9_]+-(eng|userdebug)' "$MENU" | head -n1 || true)"
+          # Android 16+ needs <product>-<release>-<variant>.  Collect release
+          # names from the lunch menu, the release_configs dir and the release
+          # config map, then probe each one.
+          RELS="$(grep -oE '\-[A-Za-z0-9_]+-(eng|userdebug)' "$MENU" 2>/dev/null | sed -E 's/^-(.*)-(eng|userdebug)$/\1/' | sort -u | head -n 10)"
+          RELS="$RELS $(ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 10)"
+          RELS="$RELS $(grep -hoE '^[A-Za-z0-9_]+[[:space:]]*:=' build/release/release_config_map.mk 2>/dev/null | sed 's/[[:space:]]*:=//' | head -n 10)"
+          echo "release candidates: $RELS"
+
+          COMBO="$(grep -oE 'twrp_PJV110-[A-Za-z0-9_]+-(eng|userdebug)' "$MENU" | head -n1)"
           echo "combo from menu: ${COMBO:-<none>}"
 
-          CANDIDATES="${COMBO:-}"
-          for REL in $(ls build/release/release_configs 2>/dev/null | sed 's/\.textproto$//' | head -n 8) trunk_staging; do
+          CANDIDATES="$COMBO"
+          for REL in $RELS trunk_staging; do
             CANDIDATES="$CANDIDATES twrp_PJV110-${REL}-eng"
           done
+          CANDIDATES="$(printf '%s\n' $CANDIDATES | awk 'NF && !seen[$0]++' | head -n 12)"
+          echo "candidates:"
+          printf '  %s\n' $CANDIDATES
 
           ok=0
           for C in $CANDIDATES; do
             echo "== lunch $C =="
-            if lunch "$C"; then ok=1; COMBO="$C"; break; fi
+            lunch "$C"
+            rc=$?
+            echo "lunch rc=$rc"
+            if [ $rc -eq 0 ]; then ok=1; COMBO="$C"; break; fi
           done
           if [ "$ok" != "1" ]; then
             echo "!! no working lunch combo for twrp_PJV110"
@@ -117,7 +139,6 @@ jobs:
           echo "== using combo: $COMBO =="
 
           echo "== mka recoveryimage =="
-          set +e
           mka recoveryimage -j"$(nproc)" 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           rc=${PIPESTATUS[0]}
           echo "build exit code: $rc"
