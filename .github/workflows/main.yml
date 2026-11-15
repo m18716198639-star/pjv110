@@ -28,12 +28,20 @@ jobs:
 
       - name: Add swap (AOSP build needs > 16GB RAM)
         run: |
-          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          set +e
+          swapon --show
+          # /swapfile may already be active on the runner image ("Text file busy"),
+          # so use a separate file.  Never fail the job over swap.
+          sudo swapoff /swapfile2 2>/dev/null
+          sudo rm -f /swapfile2
+          sudo fallocate -l 12G /swapfile2 || sudo dd if=/dev/zero of=/swapfile2 bs=1M count=12288
+          sudo chmod 600 /swapfile2
+          sudo mkswap /swapfile2
+          sudo swapon /swapfile2
+          echo "== memory =="
           free -h
           swapon --show
+          exit 0
 
       - name: Install dependencies
         run: |
