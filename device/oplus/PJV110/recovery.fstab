@@ -1,0 +1,53 @@
+# OrangeFox / TWRP recovery.fstab — OPPO Reno12 PJV110 (mt6895, A/B, dynamic)
+#
+# <src> <mnt_point> <type> <mnt_flags> <fs_mgr_flags>
+#
+# Dynamic partitions (inside super).  Source names are logical partition names;
+# TWRP maps them through liblp when the "logical" flag is present.
+/dev/block/by-name/system          /system_root  ext4   ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/system          /system_root  erofs  ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/system_ext      /system_ext   ext4   ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/system_ext      /system_ext   erofs  ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/product         /product      ext4   ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/product         /product      erofs  ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/vendor          /vendor       ext4   ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/vendor          /vendor       erofs  ro    wait,slotselect,logical,first_stage_mount
+/dev/block/by-name/odm             /odm          ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/odm             /odm          erofs  ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/vendor_dlkm     /vendor_dlkm  ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/odm_dlkm        /odm_dlkm     ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/system_dlkm     /system_dlkm  ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+
+# OPPO proprietary dynamic partitions (ColorOS)
+/dev/block/by-name/my_product      /my_product   ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_stock        /my_stock     ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_heytap       /my_heytap    ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_carrier      /my_carrier   ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_company      /my_company   ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_engineering  /my_engineering ext4 ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_manifest     /my_manifest  ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_preload      /my_preload   ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_region       /my_region    ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+/dev/block/by-name/my_bigball      /my_bigball   ext4   ro    wait,slotselect,logical,first_stage_mount,nofail
+
+# Physical partitions
+/dev/block/by-name/userdata        /data         f2fs   noatime,nosuid,nodev,discard,noflush_merge,fsync_mode=nobarrier,reserve_root=134217,resgid=1065,inlinecrypt  wait,check,formattable,quota,latemount,resize,reservedsize=128m,checkpoint=fs,fileencryption=aes-256-xts:aes-256-cts:v2+inlinecrypt_optimized,keydirectory=/metadata/vold/metadata_encryption,fsverity
+/dev/block/by-name/metadata        /metadata     ext4   noatime,nosuid,nodev,discard  wait,check,formattable
+/dev/block/by-name/oplusreserve2   /cache        ext4   noatime,nosuid,nodev,noauto_da_alloc,discard  wait,check,formattable
+/dev/block/by-name/persist         /persist      ext4   noatime,nosuid,nodev  wait,check
+/dev/block/by-name/frp             /persistent   emmc   defaults  defaults
+/dev/block/by-name/nvram           /nvram        emmc   defaults  defaults
+/dev/block/by-name/proinfo         /proinfo      emmc   defaults  defaults
+/dev/block/by-name/misc            /misc         emmc   defaults  defaults
+/dev/block/by-name/boot            /boot         emmc   defaults  defaults
+/dev/block/by-name/dtbo            /dtbo         emmc   defaults  defaults
+/dev/block/by-name/vbmeta          /vbmeta       emmc   defaults  defaults
+/dev/block/by-name/expdb           /expdb        emmc   defaults  defaults
+/dev/block/by-name/seccfg          /seccfg       emmc   defaults  defaults
+/dev/block/by-name/logo            /logo         emmc   defaults  defaults
+/dev/block/by-name/para            /para         emmc   defaults  defaults
+/dev/block/by-name/otp             /otp          emmc   defaults  defaults
+
+# USB / SD
+/devices/platform/11200000.usb3_xhci*  /usb_otg  vfat  defaults  voldmanaged=usbotg:auto
+/devices/platform/externdevice*        /external_sd vfat defaults voldmanaged=sdcard1:auto

@@ -1,0 +1,10 @@
+{
+  "header_version": 4,
+  "page_size": 4096,
+  "kernel_addr": "0x40000000",
+  "ramdisk_addr": "0x66f00000",
+  "tags_addr": "0x47c80000",
+  "dtb_addr": "0x47c80000",
+  "cmdline": "bootopt=64S3,32N2,64N2 bootconfig buildvariant=user",
+  "dtb_size": 327534
+}

@@ -1,0 +1,25 @@
+#
+# OPPO Reno12 PJV110 — OrangeFox build variables
+# (kept in sync with BoardConfig.mk; exported as env vars for the OF scripts)
+#
+
+export OF_SCREEN_H=2400
+export OF_STATUS_H=99
+export OF_STATUS_INDENT_LEFT=48
+export OF_STATUS_INDENT_RIGHT=48
+export OF_HIDE_NOTCH=1
+export OF_CLOCK_POS=1
+export OF_ALLOW_DISABLE_NAVBAR=0
+export OF_DISABLE_OTA_MENU=1
+export OF_NO_TREBLE_CHECK=1
+export OF_SKIP_MULTIUSER_FOLDERS_BACKUP=1
+export OF_QUICK_BACKUP_LIST="/boot;"
+export OF_UNBIND_SDCARD_F2FS=1
+export OF_USE_LZ4_COMPRESSION=1
+
+export FOX_USE_BASH_SHELL=1
+export FOX_USE_TAR_BINARY=1
+export FOX_USE_ZSTD_BINARY=1
+export FOX_USE_LZ4_BINARY=1
+export FOX_ENABLE_APP_MANAGER=1
+export FOX_REPLACE_BUSYBOX_PS=1
