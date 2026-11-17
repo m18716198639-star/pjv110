@@ -205,9 +205,11 @@ jobs:
           name: OrangeFox-PJV110-vendor_boot
           path: |
             OrangeFox-PJV110-vendor_boot.img
+            OrangeFox-*.img
+            OrangeFox-*.zip
             build.log
             lunch_menu.txt
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Upload build log (failure)
         if: failure()
