@@ -113,6 +113,20 @@ jobs:
           echo "== AndroidProducts.mk (used) =="
           cat "$DT/AndroidProducts.mk"
 
+      - name: Ensure prebuilt kernel exists
+        run: |
+          K="$HOME/fox/device/oplus/PJV110/prebuilt/kernel"
+          mkdir -p "$(dirname "$K")"
+          SIZE=$(stat -c%s "$K" 2>/dev/null || echo 0)
+          echo "kernel size: $SIZE"
+          if [ "$SIZE" -lt 1048576 ]; then
+            echo "!! prebuilt kernel missing or too small, creating a dummy one."
+            echo "!! It is only used by the intermediate boot.img; we pack"
+            echo "!! out/target/product/PJV110/recovery/root directly and never boot it."
+            head -c 4194304 /dev/zero > "$K"
+          fi
+          ls -l "$K"
+
       - name: Build recovery image
         run: |
           set +e
@@ -185,11 +199,11 @@ jobs:
           free -h
 
           echo "== mka recoveryimage (-j3) =="
-          mka recoveryimage bootimage -j3 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          mka recoveryimage -j3 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           rc=${PIPESTATUS[0]}
           if [ $rc -ne 0 ]; then
             echo "== first attempt failed ($rc), retrying with -j2 =="
-            mka recoveryimage bootimage -j2 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
+            mka recoveryimage -j2 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
             rc=${PIPESTATUS[0]}
           fi
           echo "build exit code: $rc"
