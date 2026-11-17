@@ -16,13 +16,20 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 PRODUCT_OUT="$SRC/out/target/product/PJV110"
-IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'recovery.img' 2>/dev/null | head -n1 || true)"
+IMG=""
+for CAND in recovery.img boot.img; do
+    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name "$CAND" 2>/dev/null | head -n1 || true)"
+    [ -n "$IMG" ] && break
+done
 if [ -z "$IMG" ]; then
-    echo "!! recovery.img not found under $PRODUCT_OUT"
+    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'OrangeFox-*.img' 2>/dev/null | head -n1 || true)"
+fi
+if [ -z "$IMG" ]; then
+    echo "!! no recovery/boot/OrangeFox image found under $PRODUCT_OUT"
     find "$SRC/out/target/product" -maxdepth 2 -name '*.img' 2>/dev/null | head -n 40 || true
     exit 1
 fi
-echo "== recovery image: $IMG"
+echo "== source image: $IMG"
 ls -l "$IMG"
 
 echo "== unpack recovery ramdisk"
@@ -91,3 +98,11 @@ fi
 
 cp "$OUT/OrangeFox-PJV110-vendor_boot.img" "$ROOT/OrangeFox-PJV110-vendor_boot.img"
 ls -l "$ROOT/OrangeFox-PJV110-vendor_boot.img"
+
+# Keep OrangeFox's own boot-as-recovery image/zip as extra artifacts (not used
+# for flashing on this device, but useful for reference/backup).
+for f in "$PRODUCT_OUT"/OrangeFox-*.img "$PRODUCT_OUT"/OrangeFox-*.zip; do
+    if [ -e "$f" ]; then
+        cp -f "$f" "$ROOT/" && echo "copied $(basename "$f")"
+    fi
+done
