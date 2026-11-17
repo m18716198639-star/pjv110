@@ -89,7 +89,29 @@ jobs:
         run: |
           mkdir -p "$HOME/fox/device/oplus"
           cp -r device/oplus/PJV110 "$HOME/fox/device/oplus/PJV110"
-          ls -l "$HOME/fox/device/oplus/PJV110"
+          DT="$HOME/fox/device/oplus/PJV110"
+          echo "== device tree =="
+          ls -l "$DT"
+
+          for f in BoardConfig.mk twrp_PJV110.mk device.mk recovery.fstab vendorsetup.sh; do
+            if [ ! -f "$DT/$f" ]; then
+              echo "!! missing $DT/$f"
+              exit 1
+            fi
+          done
+
+          echo "== AndroidProducts.mk (as uploaded) =="
+          head -n 25 "$DT/AndroidProducts.mk"
+          if ! grep -q '^PRODUCT_MAKEFILES' "$DT/AndroidProducts.mk"; then
+            echo "!! AndroidProducts.mk is broken, rewriting canonical content"
+            printf '%s\n' \
+              'PRODUCT_MAKEFILES := device/oplus/PJV110/twrp_PJV110.mk' \
+              '' \
+              'COMMON_LUNCH_CHOICES := twrp_PJV110-eng twrp_PJV110-userdebug' \
+              > "$DT/AndroidProducts.mk"
+          fi
+          echo "== AndroidProducts.mk (used) =="
+          cat "$DT/AndroidProducts.mk"
 
       - name: Build recovery image
         run: |
