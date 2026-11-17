@@ -177,6 +177,10 @@ jobs:
           fi
           echo "== using combo: $COMBO =="
 
+          echo "== product config =="
+          ls build/make/target/product/embedded.mk 2>/dev/null || echo "(no embedded.mk)"
+          get_build_var PRODUCT_APEX_SYSTEM_SERVER_JARS 2>/dev/null || true
+
           echo "== memory =="
           free -h
 
