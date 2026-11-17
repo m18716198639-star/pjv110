@@ -263,6 +263,29 @@ def build_from_scratch(ramdisk_cpio, dtb, cmdline, out, compress="lz4"):
           % (out, len(ramdisk_cpio), compress, len(comp), len(dtb), len(out_b)))
 
 
+def build_boot_v2(kernel, ramdisk_comp, cmdline, out, page=4096):
+    """Create a classic boot/recovery image (header v2): kernel + compressed ramdisk."""
+    hdr = bytearray(page)
+    struct.pack_into("<8s6I", hdr, 0, b"ANDROID!",
+                     len(kernel), 0x00008000, len(ramdisk_comp), 0x01000000, 0, 0)
+    # tags_addr, page_size, header_version(2), os_version
+    struct.pack_into("<4I", hdr, 32, 0x00000100, page, 2, 0)
+    cb = cmdline.encode()[:511]
+    hdr[64:64 + len(cb)] = cb
+    # header v2 extra fields
+    struct.pack_into("<Q", hdr, 1608, 0)      # recovery_dtbo_size
+    struct.pack_into("<Q", hdr, 1616, 0)      # recovery_dtbo_offset
+    struct.pack_into("<I", hdr, 1624, 1628)   # header_size
+    out_b = bytearray(hdr)
+    out_b += kernel
+    out_b += b"\x00" * ((page - len(kernel) % page) % page)
+    out_b += ramdisk_comp
+    out_b += b"\x00" * ((page - len(ramdisk_comp) % page) % page)
+    open(out, "wb").write(out_b)
+    print("wrote %s: kernel=%d ramdisk=%d image=%d"
+          % (out, len(kernel), len(ramdisk_comp), len(out_b)))
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1]
     if cmd == "info":
@@ -271,6 +294,16 @@ if __name__ == "__main__":
         cmd_roundtrip(sys.argv[2], sys.argv[3])
     elif cmd == "repack":
         cmd_repack(sys.argv[2], sys.argv[3], sys.argv[4])
+    elif cmd == "mkboot":
+        import argparse
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--kernel", required=True)
+        ap.add_argument("--ramdisk", required=True, help="uncompressed newc cpio")
+        ap.add_argument("--cmdline", default="bootopt=64S3,32N2,64N2 bootconfig buildvariant=user")
+        ap.add_argument("--out", required=True)
+        a = ap.parse_args(sys.argv[2:])
+        comp = lz4_legacy_compress(open(a.ramdisk, "rb").read())
+        build_boot_v2(open(a.kernel, "rb").read(), comp, a.cmdline, a.out)
     elif cmd == "build":
         import argparse
         ap = argparse.ArgumentParser()

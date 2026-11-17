@@ -22,23 +22,16 @@ PRODUCT_OUT="$SRC/out/target/product/PJV110"
 REC_ROOT="$PRODUCT_OUT/recovery/root"
 
 echo "== looking for ramdisk source =="
-if [ -d "$REC_ROOT" ] && [ -n "$(ls -A "$REC_ROOT" 2>/dev/null || true)" ]; then
-    echo "== using built recovery root: $REC_ROOT"
-    cp -a "$REC_ROOT" "$OUT/root"
-else
-    IMG=""
-    for CAND in recovery.img boot.img; do
-        IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name "$CAND" 2>/dev/null | head -n1 || true)"
-        [ -n "$IMG" ] && break
-    done
-    if [ -z "$IMG" ]; then
-        IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'OrangeFox-*.img' 2>/dev/null | head -n1 || true)"
-    fi
-    if [ -z "$IMG" ]; then
-        echo "!! no recovery root and no image found under $PRODUCT_OUT"
-        ls -l "$PRODUCT_OUT" 2>/dev/null | head -n 40 || true
-        exit 1
-    fi
+IMG=""
+for CAND in recovery.img boot.img; do
+    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name "$CAND" 2>/dev/null | head -n1 || true)"
+    [ -n "$IMG" ] && break
+done
+if [ -z "$IMG" ]; then
+    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'OrangeFox-*.img' 2>/dev/null | head -n1 || true)"
+fi
+
+if [ -n "$IMG" ]; then
     echo "== source image: $IMG"
     ls -l "$IMG"
     python3 "$ROOT/tools/androidimg.py" unpack "$IMG" "$OUT/rec"
@@ -50,12 +43,32 @@ else
     fi
     echo "== extract ramdisk"
     python3 "$ROOT/tools/cpio_tool.py" extract "$CPIO" "$OUT/root"
+elif [ -d "$REC_ROOT" ] && [ -n "$(ls -A "$REC_ROOT" 2>/dev/null || true)" ]; then
+    echo "!! no image found, falling back to recovery/root (may be incomplete!)"
+    cp -a "$REC_ROOT" "$OUT/root"
+else
+    echo "!! no image and no recovery root under $PRODUCT_OUT"
+    ls -l "$PRODUCT_OUT" 2>/dev/null | head -n 40 || true
+    exit 1
 fi
 
 if [ ! -d "$OUT/root" ] || [ -z "$(ls -A "$OUT/root" 2>/dev/null || true)" ]; then
     echo "!! ramdisk root is empty"
     exit 1
 fi
+
+# A bootable recovery ramdisk must contain an init binary.  Without this the
+# image would flash fine but hang on the bootloader, so refuse to build it.
+if [ ! -f "$OUT/root/system/bin/init" ] && [ ! -f "$OUT/root/init" ]; then
+    echo "!! ramdisk has no init binary - refusing to build an unbootable image"
+    echo "== top level =="; ls -la "$OUT/root" 2>/dev/null | head -n 30
+    echo "== system/bin =="; ls -la "$OUT/root/system/bin" 2>/dev/null | head -n 30
+    exit 1
+fi
+if [ ! -f "$OUT/root/system/bin/recovery" ] && [ ! -f "$OUT/root/sbin/recovery" ]; then
+    echo "!! warning: no recovery binary (system/bin/recovery or sbin/recovery)"
+fi
+
 echo "== ramdisk root entries: $(find "$OUT/root" | wc -l)"
 
 echo "== inject vendor modules and firmware from the stock vendor_boot"
@@ -112,6 +125,29 @@ fi
 
 cp "$OUT/OrangeFox-PJV110-vendor_boot.img" "$ROOT/OrangeFox-PJV110-vendor_boot.img"
 ls -l "$ROOT/OrangeFox-PJV110-vendor_boot.img"
+
+# ---------------------------------------------------------------- recovery.img
+# Classic recovery image (header v2: kernel + compressed OrangeFox ramdisk).
+# The user merges this into boot with an external tool, so the kernel content
+# does not matter much, but use a real one when available.
+echo "== build recovery.img (header v2) =="
+KERNEL=""
+for k in "$SRC/device/oplus/PJV110/prebuilt/kernel" "$OUT/rec/kernel.img" "$ROOT/device/oplus/PJV110/prebuilt/kernel"; do
+    if [ -s "$k" ]; then KERNEL="$k"; break; fi
+done
+if [ -z "$KERNEL" ]; then
+    echo "!! no kernel available, using a 4MB zero placeholder"
+    head -c 4194304 /dev/zero > "$OUT/kernel.img"
+    KERNEL="$OUT/kernel.img"
+fi
+echo "kernel: $KERNEL ($(stat -c%s "$KERNEL") bytes)"
+python3 "$ROOT/tools/mkvendor_boot.py" mkboot \
+    --kernel "$KERNEL" \
+    --ramdisk "$OUT/ramdisk.cpio" \
+    --cmdline "bootopt=64S3,32N2,64N2 bootconfig buildvariant=user" \
+    --out "$OUT/recovery.img"
+cp "$OUT/recovery.img" "$ROOT/recovery.img"
+ls -l "$ROOT/recovery.img"
 
 # Keep OrangeFox's own image/zip as extra artifacts (not used for flashing on
 # this device, but useful for reference/backup).

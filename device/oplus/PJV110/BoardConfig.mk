@@ -18,7 +18,6 @@ TARGET_CPU_ABI := arm64-v8a
 TARGET_CPU_ABI2 :=
 TARGET_CPU_VARIANT := generic
 TARGET_CPU_VARIANT_RECOVERY := generic
-TARGET_USES_64_BIT_BINDER := true
 TARGET_SUPPORTS_64_BIT_APPS := true
 
 TARGET_BOARD_PLATFORM := mt6895
@@ -52,11 +51,12 @@ BOARD_OPLUS_DYNAMIC_PARTITIONS_PARTITION_LIST := \
 BOARD_OPLUS_DYNAMIC_PARTITIONS_SIZE := 15674114048
 BOARD_USES_METADATA_PARTITION := true
 
-# NOTE: no AB_OTA_UPDATER / BOARD_USES_RECOVERY_AS_BOOT here on purpose.
-# The device is A/B in reality, but for this port we only need a plain
-# recovery.img (kernel + OrangeFox ramdisk) as an intermediate; the final
-# product is a vendor_boot image built by scripts/pack.sh.  Slot/A-B handling
-# at runtime is driven by androidboot.slot_suffix from the bootloader.
+# NOTE: the device is A/B without a dedicated recovery partition.  OrangeFox /
+# TWRP expect the classic recovery-as-boot layout here: the recovery ramdisk is
+# assembled into boot.img, which is what scripts/pack.sh unpacks and repacks
+# into vendor_boot (the partition the bootloader actually uses on this device).
+AB_OTA_UPDATER := true
+BOARD_USES_RECOVERY_AS_BOOT := true
 
 # ------------------------------------------------------------------ recovery
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab

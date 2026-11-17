@@ -226,6 +226,11 @@ def redump(path, outdir):
     if info["type"] == "boot":
         rd = data[info["ramdisk_off"]:info["ramdisk_off"] + info["ramdisk_size"]]
         open(os.path.join(outdir, "ramdisk.img"), "wb").write(rd)
+        ks = info.get("kernel_size") or 0
+        if ks:
+            ko = info.get("kernel_off", 4096)
+            open(os.path.join(outdir, "kernel.img"), "wb").write(data[ko:ko + ks])
+            print("  kernel dumped -> kernel.img (%d bytes)" % ks)
         try:
             raw = decompress(rd)
             open(os.path.join(outdir, "ramdisk.cpio"), "wb").write(raw)
