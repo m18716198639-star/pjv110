@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 #
-# Build the OrangeFox vendor_boot image for PJV110 from the recovery.img that
-# the AOSP/OrangeFox build produced.
+# Build the OrangeFox vendor_boot image for PJV110.
+#
+# Prefers the recovery ramdisk tree that the build already assembled
+# (out/target/product/PJV110/recovery/root).  Falls back to unpacking
+# recovery.img / boot.img / OrangeFox-*.img if that directory is missing.
 #
 #   SRC=$HOME/fox bash scripts/pack.sh
 #
@@ -16,33 +19,44 @@ rm -rf "$OUT"
 mkdir -p "$OUT"
 
 PRODUCT_OUT="$SRC/out/target/product/PJV110"
-IMG=""
-for CAND in recovery.img boot.img; do
-    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name "$CAND" 2>/dev/null | head -n1 || true)"
-    [ -n "$IMG" ] && break
-done
-if [ -z "$IMG" ]; then
-    IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'OrangeFox-*.img' 2>/dev/null | head -n1 || true)"
+REC_ROOT="$PRODUCT_OUT/recovery/root"
+
+echo "== looking for ramdisk source =="
+if [ -d "$REC_ROOT" ] && [ -n "$(ls -A "$REC_ROOT" 2>/dev/null || true)" ]; then
+    echo "== using built recovery root: $REC_ROOT"
+    cp -a "$REC_ROOT" "$OUT/root"
+else
+    IMG=""
+    for CAND in recovery.img boot.img; do
+        IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name "$CAND" 2>/dev/null | head -n1 || true)"
+        [ -n "$IMG" ] && break
+    done
+    if [ -z "$IMG" ]; then
+        IMG="$(find "$PRODUCT_OUT" -maxdepth 1 -name 'OrangeFox-*.img' 2>/dev/null | head -n1 || true)"
+    fi
+    if [ -z "$IMG" ]; then
+        echo "!! no recovery root and no image found under $PRODUCT_OUT"
+        ls -l "$PRODUCT_OUT" 2>/dev/null | head -n 40 || true
+        exit 1
+    fi
+    echo "== source image: $IMG"
+    ls -l "$IMG"
+    python3 "$ROOT/tools/androidimg.py" unpack "$IMG" "$OUT/rec"
+    CPIO="$OUT/rec/ramdisk.cpio"
+    if [ ! -f "$CPIO" ]; then
+        echo "!! ramdisk.cpio not produced"
+        ls -l "$OUT/rec" || true
+        exit 1
+    fi
+    echo "== extract ramdisk"
+    python3 "$ROOT/tools/cpio_tool.py" extract "$CPIO" "$OUT/root"
 fi
-if [ -z "$IMG" ]; then
-    echo "!! no recovery/boot/OrangeFox image found under $PRODUCT_OUT"
-    find "$SRC/out/target/product" -maxdepth 2 -name '*.img' 2>/dev/null | head -n 40 || true
+
+if [ ! -d "$OUT/root" ] || [ -z "$(ls -A "$OUT/root" 2>/dev/null || true)" ]; then
+    echo "!! ramdisk root is empty"
     exit 1
 fi
-echo "== source image: $IMG"
-ls -l "$IMG"
-
-echo "== unpack recovery ramdisk"
-python3 "$ROOT/tools/androidimg.py" unpack "$IMG" "$OUT/rec"
-CPIO="$OUT/rec/ramdisk.cpio"
-if [ ! -f "$CPIO" ]; then
-    echo "!! ramdisk.cpio not produced"
-    ls -l "$OUT/rec" || true
-    exit 1
-fi
-
-echo "== extract ramdisk"
-python3 "$ROOT/tools/cpio_tool.py" extract "$CPIO" "$OUT/root"
+echo "== ramdisk root entries: $(find "$OUT/root" | wc -l)"
 
 echo "== inject vendor modules and firmware from the stock vendor_boot"
 tar -xzf "$ROOT/prebuilt/modules.tar.gz"      -C "$OUT/root"
@@ -99,8 +113,8 @@ fi
 cp "$OUT/OrangeFox-PJV110-vendor_boot.img" "$ROOT/OrangeFox-PJV110-vendor_boot.img"
 ls -l "$ROOT/OrangeFox-PJV110-vendor_boot.img"
 
-# Keep OrangeFox's own boot-as-recovery image/zip as extra artifacts (not used
-# for flashing on this device, but useful for reference/backup).
+# Keep OrangeFox's own image/zip as extra artifacts (not used for flashing on
+# this device, but useful for reference/backup).
 for f in "$PRODUCT_OUT"/OrangeFox-*.img "$PRODUCT_OUT"/OrangeFox-*.zip; do
     if [ -e "$f" ]; then
         cp -f "$f" "$ROOT/" && echo "copied $(basename "$f")"
