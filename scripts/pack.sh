@@ -43,6 +43,18 @@ if [ -n "$IMG" ]; then
     fi
     echo "== extract ramdisk"
     python3 "$ROOT/tools/cpio_tool.py" extract "$CPIO" "$OUT/root"
+elif [ -f "$PRODUCT_OUT/ramdisk-recovery.img" ]; then
+    echo "== source: $PRODUCT_OUT/ramdisk-recovery.img (raw recovery ramdisk)"
+    python3 - "$PRODUCT_OUT/ramdisk-recovery.img" "$OUT/ramdisk-direct.cpio" "$ROOT/tools" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[3])
+from androidimg import decompress
+data = open(sys.argv[1], "rb").read()
+raw = decompress(data)
+open(sys.argv[2], "wb").write(raw)
+print("decompressed ramdisk: %d -> %d bytes" % (len(data), len(raw)))
+PY
+    python3 "$ROOT/tools/cpio_tool.py" extract "$OUT/ramdisk-direct.cpio" "$OUT/root"
 elif [ -d "$REC_ROOT" ] && [ -n "$(ls -A "$REC_ROOT" 2>/dev/null || true)" ]; then
     echo "!! no image found, falling back to recovery/root (may be incomplete!)"
     cp -a "$REC_ROOT" "$OUT/root"
