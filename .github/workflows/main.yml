@@ -206,6 +206,8 @@ jobs:
             mka recoveryimage -j2 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
             rc=${PIPESTATUS[0]}
           fi
+          echo "== images produced =="
+          ls -l "$HOME/fox/out/target/product/PJV110"/*.img 2>/dev/null || echo "(no .img files)"
           echo "build exit code: $rc"
           exit $rc
 
@@ -224,6 +226,7 @@ jobs:
         with:
           name: OrangeFox-PJV110-vendor_boot
           path: |
+            recovery.img
             OrangeFox-PJV110-vendor_boot.img
             OrangeFox-*.img
             OrangeFox-*.zip
