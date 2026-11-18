@@ -198,16 +198,27 @@ jobs:
           echo "== memory =="
           free -h
 
-          echo "== mka recoveryimage (-j3) =="
-          mka recoveryimage -j3 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+          PRODUCT_OUT="$HOME/fox/out/target/product/PJV110"
+
+          echo "== try ramdisk-recovery.img only (avoids vendor sepolicy) =="
+          mka ramdisk-recovery.img -j3 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
           rc=${PIPESTATUS[0]}
-          if [ $rc -ne 0 ]; then
-            echo "== first attempt failed ($rc), retrying with -j2 =="
-            mka recoveryimage -j2 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
+          echo "ramdisk target rc=$rc"
+
+          if [ ! -f "$PRODUCT_OUT/ramdisk-recovery.img" ]; then
+            echo "== retry with absolute path target =="
+            mka "$PRODUCT_OUT/ramdisk-recovery.img" -j3 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
             rc=${PIPESTATUS[0]}
           fi
+
+          if [ ! -f "$PRODUCT_OUT/ramdisk-recovery.img" ]; then
+            echo "== still no ramdisk, fallback: mka recoveryimage =="
+            mka recoveryimage -j3 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
+            rc=${PIPESTATUS[0]}
+          fi
+
           echo "== images produced =="
-          ls -l "$HOME/fox/out/target/product/PJV110"/*.img 2>/dev/null || echo "(no .img files)"
+          ls -l "$PRODUCT_OUT"/*.img 2>/dev/null || echo "(no .img files)"
           echo "build exit code: $rc"
           exit $rc
 
