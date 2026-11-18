@@ -51,12 +51,12 @@ BOARD_OPLUS_DYNAMIC_PARTITIONS_PARTITION_LIST := \
 BOARD_OPLUS_DYNAMIC_PARTITIONS_SIZE := 15674114048
 BOARD_USES_METADATA_PARTITION := true
 
-# NOTE: the device is A/B without a dedicated recovery partition.  OrangeFox /
-# TWRP expect the classic recovery-as-boot layout here: the recovery ramdisk is
-# assembled into boot.img, which is what scripts/pack.sh unpacks and repacks
-# into vendor_boot (the partition the bootloader actually uses on this device).
-AB_OTA_UPDATER := true
-BOARD_USES_RECOVERY_AS_BOOT := true
+# The device is A/B without a dedicated recovery partition, but the classic
+# recovery.img code path in the build system is gated on
+# BOARD_RECOVERYIMAGE_PARTITION_SIZE.  We only use that image as a container
+# for the OrangeFox ramdisk, which scripts/pack.sh then repacks into
+# vendor_boot (the partition this bootloader actually uses for recovery).
+BOARD_RECOVERYIMAGE_PARTITION_SIZE := 67108864
 
 # ------------------------------------------------------------------ recovery
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab
